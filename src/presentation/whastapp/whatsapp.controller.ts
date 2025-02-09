@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import axios, { AxiosError } from 'axios';
+import axios from 'axios';
+import { AxiosError } from 'axios';
 const twilio = require("twilio");
 
 // Definición de la interfaz para un jugador, según tu modelo en Prisma
@@ -27,14 +28,14 @@ export class WhatsappController {
     req: Request,
     res: Response,
     next: NextFunction
-  ): Promise<void> => {
+  ): Promise<Response<any, Record<string, any>>> => {
     const { Body, From } = req.body;
     const message = Body.trim();
 
     // Extraer el número sin el prefijo "whatsapp:"
     let rawPhone = From.replace("whatsapp:", "").trim();
 
-    // Quitar el código de país, asumiendo que es "+57"
+    // Quitar el código de país, asumiendo que es "+57" o "57"
     if (rawPhone.startsWith("+57")) {
       rawPhone = rawPhone.substring(3);
     } else if (rawPhone.startsWith("57")) {
@@ -59,8 +60,7 @@ export class WhatsappController {
       if (jugadorRegistrado) {
         const twiml = new twilio.twiml.MessagingResponse();
         twiml.message(`⚽ ¡Hola ${jugadorRegistrado.nombres}, ya estás autenticado!`);
-        res.type("text/xml").send(twiml.toString());
-        return;
+        return res.type("text/xml").send(twiml.toString());
       }
 
       // 2. Si el usuario no está autenticado, revisar si ya se le pidió la cédula.
@@ -68,8 +68,7 @@ export class WhatsappController {
         pendingAuth.set(rawPhone, true);
         const twiml = new twilio.twiml.MessagingResponse();
         twiml.message("👋 Para autenticarte, por favor envía tu número de cédula.");
-        res.type("text/xml").send(twiml.toString());
-        return;
+        return res.type("text/xml").send(twiml.toString());
       }
 
       // 3. Se asume que el mensaje recibido es la cédula.
@@ -78,31 +77,37 @@ export class WhatsappController {
       let jugador: Jugador | null = null;
       try {
         const responseCedula = await axios.get(`${API_BASE_URL}/jugadorporcedula/${cedula}`);
-        jugador = responseCedula.data;
+        const data = responseCedula.data;
+        // Validar si la respuesta indica un error (por ejemplo, { "error": {} }).
+        if (data && data.error !== undefined) {
+          if (Object.keys(data.error).length === 0) {
+            const twiml = new twilio.twiml.MessagingResponse();
+            twiml.message(`❌ No se encontró la cédula ${cedula} en el sistema. Por favor, verifica e intenta de nuevo.`);
+            return res.type("text/xml").send(twiml.toString());
+          }
+        }
+        jugador = data;
       } catch (error) {
-        if (
-          axios.isAxiosError(error) &&
-          error.response &&
-          (error.response.status === 404 ||
-           (typeof error.response.data === "string" && error.response.data.includes("Cannot GET")))
-        ) {
-          const twiml = new twilio.twiml.MessagingResponse();
-          twiml.message(`❌ No se encontró la cédula ${cedula} en el sistema. Por favor, verifica e intenta de nuevo.`);
-          // Se mantiene el estado pendiente para permitir reintentos.
-          res.type("text/xml").send(twiml.toString());
-          return;
-        } else if (axios.isAxiosError(error)) {
-          console.error("Error al obtener la cédula:", error.message);
-          const twiml = new twilio.twiml.MessagingResponse();
-          twiml.message("⚠️ Ocurrió un error al procesar tu solicitud. Intenta más tarde.");
-          res.type("text/xml").send(twiml.toString());
-          return;
+        if (axios.isAxiosError(error)) {
+          if (
+            error.response &&
+            (error.response.status === 404 ||
+             (typeof error.response.data === "string" && error.response.data.includes("Cannot GET")))
+          ) {
+            const twiml = new twilio.twiml.MessagingResponse();
+            twiml.message(`❌ No se encontró la cédula ${cedula} en el sistema. Por favor, verifica e intenta de nuevo.`);
+            return res.type("text/xml").send(twiml.toString());
+          } else {
+            console.error("Error al obtener la cédula:", error.message);
+            const twiml = new twilio.twiml.MessagingResponse();
+            twiml.message("⚠️ Ocurrió un error al procesar tu solicitud. Intenta más tarde.");
+            return res.type("text/xml").send(twiml.toString());
+          }
         } else {
           console.error("Error al obtener la cédula:", error);
           const twiml = new twilio.twiml.MessagingResponse();
           twiml.message("⚠️ Ocurrió un error al procesar tu solicitud. Intenta más tarde.");
-          res.type("text/xml").send(twiml.toString());
-          return;
+          return res.type("text/xml").send(twiml.toString());
         }
       }
 
@@ -111,8 +116,7 @@ export class WhatsappController {
         if (jugador.telefono !== rawPhone) {
           const twiml = new twilio.twiml.MessagingResponse();
           twiml.message(`❌ El número de WhatsApp (${rawPhone}) no coincide con el número registrado (${jugador.telefono}).`);
-          res.type("text/xml").send(twiml.toString());
-          return;
+          return res.type("text/xml").send(twiml.toString());
         }
         // 5. Si coincide, actualizar el registro asignando id_telegram usando el endpoint PUT.
         try {
@@ -125,14 +129,12 @@ export class WhatsappController {
           }
           const twiml = new twilio.twiml.MessagingResponse();
           twiml.message("⚠️ Hubo un error al actualizar tu registro. Intenta más tarde.");
-          res.type("text/xml").send(twiml.toString());
-          return;
+          return res.type("text/xml").send(twiml.toString());
         }
         pendingAuth.delete(rawPhone);
         const twiml = new twilio.twiml.MessagingResponse();
         twiml.message(`✅ Registro exitoso, ${jugador.nombres}! Ahora estás autenticado.`);
-        res.type("text/xml").send(twiml.toString());
-        return;
+        return res.type("text/xml").send(twiml.toString());
       }
     } catch (error) {
       if (axios.isAxiosError(error)) {
@@ -142,8 +144,9 @@ export class WhatsappController {
       }
       const twiml = new twilio.twiml.MessagingResponse();
       twiml.message("⚠️ Ocurrió un error al procesar tu solicitud. Intenta más tarde.");
-      res.type("text/xml").send(twiml.toString());
-      return;
+      return res.type("text/xml").send(twiml.toString());
     }
+    // Agregar un retorno final para asegurar que la función siempre retorne algo.
+    return res.end();
   }
 }
