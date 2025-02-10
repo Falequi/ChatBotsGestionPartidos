@@ -42,7 +42,7 @@ export class WhatsappController {
           const partidosVigentes = await this.obtenerPartidosVigentes();
           pendingMatchSelection.set(idUsuario, partidosVigentes);
           
-          // Enviamos el mensaje de confirmación SIN el menú.
+          // Se envía el mensaje de confirmación SIN el menú.
           this.mensajeAlUsuario(res, `Hola ${nombre}, gracias por autenticarte.\n\n${listaPartidos}`);
           return;
         } catch (error) {
@@ -109,7 +109,9 @@ export class WhatsappController {
           case "3": // Opción Ver Listado de Jugadores
             {
               const listadoJugadores = await this.obtenerListadoJugadores(idUsuario);
-              this.mensajeAlUsuario(res, listadoJugadores);
+              // Se concatena el menú personalizado después del listado.
+              const menu = this.getMenuForMatchById(idUsuario);
+              this.mensajeAlUsuario(res, listadoJugadores + "\n\n" + menu);
             }
             return;
           case "4": // Opción Salir: reiniciar el flujo
@@ -139,6 +141,15 @@ export class WhatsappController {
   private getMenuForMatch = (match: any): string => {
     const fechaFormateada = this.formatFecha(match.fecha);
     return `Seleccione una opción para el partido del ${fechaFormateada} a las ${match.hora} en ${match.lugar}:\n1. Convocarme.\n2. Desconvocarme.\n3. Ver Listado de Jugadores.\n4. Salir.`;
+  };
+
+  // Método para obtener el menú personalizado basado en el partido seleccionado almacenado.
+  private getMenuForMatchById = (idUsuario: string): string => {
+    if (selectedMatch.has(idUsuario)) {
+      const match = selectedMatch.get(idUsuario);
+      return this.getMenuForMatch(match);
+    }
+    return this.getMenu();
   };
 
   // Método para obtener el menú genérico.
@@ -208,7 +219,7 @@ export class WhatsappController {
       if (data.jugadores && Array.isArray(data.jugadores)) {
         data.jugadores.forEach((jugador: any, index: number) => {
           const asterisco = jugador.estado_pago ? "* " : "";
-          mensajeListado += `${index + 1}- ${asterisco}${jugador.nombre_corto}\n`;
+          mensajeListado += `${index + 1}- ${jugador.nombre_corto} ${asterisco} \n`;
         });
       }
       mensajeListado += "-------------------";
