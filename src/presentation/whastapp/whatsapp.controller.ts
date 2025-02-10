@@ -6,7 +6,7 @@ const twilio = require("twilio");
 const pendingCedula: Map<string, boolean> = new Map();           // Usuarios que aún deben enviar su cédula.
 const authenticatedUsers: Map<string, any> = new Map();            // Objeto jugador autenticado.
 const pendingMatchSelection: Map<string, any[]> = new Map();       // Lista de partidos disponibles para cada usuario.
-const selectedMatch: Map<string, number> = new Map();              // ID del partido seleccionado para cada usuario.
+const selectedMatch: Map<string, any> = new Map();                 // Objeto del partido seleccionado para cada usuario.
 
 export class WhatsappController {
 
@@ -42,6 +42,7 @@ export class WhatsappController {
           const partidosVigentes = await this.obtenerPartidosVigentes();
           pendingMatchSelection.set(idUsuario, partidosVigentes);
           
+          // Enviamos el mensaje de confirmación SIN el menú.
           this.mensajeAlUsuario(res, `Hola ${nombre}, gracias por autenticarte.\n\n${listaPartidos}`);
           return;
         } catch (error) {
@@ -62,57 +63,57 @@ export class WhatsappController {
           return;
         }
         const partidoSeleccionado = matches[matchIndex - 1];
-        selectedMatch.set(idUsuario, partidoSeleccionado.id);
-        const menu = this.getMenu();
+        selectedMatch.set(idUsuario, partidoSeleccionado);
+        // Se muestra el menú de opciones personalizado para el partido seleccionado.
+        const menu = this.getMenuForMatch(partidoSeleccionado);
         this.mensajeAlUsuario(res, menu);
         pendingMatchSelection.delete(idUsuario);
         return;
       } else {
         switch (mensaje) {
-          case "1": // Convocarme
+          case "1": // Opción Convocarme
             {
               const jugador = authenticatedUsers.get(idUsuario);
-              const idPartido = selectedMatch.get(idUsuario);
-              if (!jugador || !idPartido) {
+              const match = selectedMatch.get(idUsuario);
+              if (!jugador || !match) {
                 this.mensajeAlUsuario(res, "Faltan datos para procesar tu solicitud. Por favor, revisa la lista de partidos.");
                 return;
               }
               try {
                 await axios.post(`https://gestionpartidos-production.up.railway.app/partido_jugadores/create_idjugador_idpartido`, {
                   id_jugador: jugador.id,
-                  id_partido: idPartido
+                  id_partido: match.id
                 });
-                this.mensajeAlUsuario(res, "Has sido convocado al partido exitosamente.\n\n" + this.getMenu());
+                this.mensajeAlUsuario(res, "Has sido convocado al partido exitosamente.\n\n" + this.getMenuForMatch(match));
               } catch (error) {
-                this.mensajeAlUsuario(res, "Ya estás registrado en ese partido. Por favor, revisa el listado.\n\n" + this.getMenu());
+                this.mensajeAlUsuario(res, "Ya estás registrado en ese partido. Por favor, revisa el listado.\n\n" + this.getMenuForMatch(match));
               }
             }
             return;
-          case "2": // Desconvocarme
+          case "2": // Opción Desconvocarme
             {
               const jugador = authenticatedUsers.get(idUsuario);
-              const idPartido = selectedMatch.get(idUsuario);
-              if (!jugador || !idPartido) {
+              const match = selectedMatch.get(idUsuario);
+              if (!jugador || !match) {
                 this.mensajeAlUsuario(res, "Faltan datos para procesar tu solicitud. Por favor, revisa la lista de partidos.");
                 return;
               }
               try {
-                await axios.delete(`https://gestionpartidos-production.up.railway.app/partido_jugadores/delete_id_jugador_id_partido/${jugador.id}/${idPartido}`);
-                this.mensajeAlUsuario(res, "Has sido desconvocado del partido exitosamente.\n\n" + this.getMenu());
+                await axios.delete(`https://gestionpartidos-production.up.railway.app/partido_jugadores/delete_id_jugador_id_partido/${jugador.id}/${match.id}`);
+                this.mensajeAlUsuario(res, "Has sido desconvocado del partido exitosamente.\n\n" + this.getMenuForMatch(match));
               } catch (error) {
-                this.mensajeAlUsuario(res, "No estás registrado en ese partido o ya te desconvocaste. Por favor, revisa el listado.\n\n" + this.getMenu());
+                this.mensajeAlUsuario(res, "No estás registrado en ese partido o ya te desconvocaste. Por favor, revisa el listado.\n\n" + this.getMenuForMatch(match));
               }
             }
             return;
-          case "3": // Ver Listado de Jugadores
+          case "3": // Opción Ver Listado de Jugadores
             {
               const listadoJugadores = await this.obtenerListadoJugadores(idUsuario);
               this.mensajeAlUsuario(res, listadoJugadores);
             }
             return;
-          case "4": // Salir (reiniciar el flujo)
+          case "4": // Opción Salir: reiniciar el flujo
             {
-              // Se eliminan todos los estados asociados al usuario y se le pide que digite cualquier tecla para reiniciar.
               authenticatedUsers.delete(idUsuario);
               pendingMatchSelection.delete(idUsuario);
               selectedMatch.delete(idUsuario);
@@ -121,7 +122,10 @@ export class WhatsappController {
             }
             return;
           default:
-            this.mensajeAlUsuario(res, "Opción no reconocida. Por favor, selecciona una opción válida del menú.\n\n" + this.getMenu());
+            {
+              const menu = this.getMenu();
+              this.mensajeAlUsuario(res, "Opción no reconocida. Por favor, selecciona una opción válida.\n\n" + menu);
+            }
             return;
         }
       }
@@ -129,11 +133,18 @@ export class WhatsappController {
 
     this.mensajeAlUsuario(res, "Mensaje no reconocido. Intenta de nuevo.");
     return;
-  }
+  };
 
+  // Método para obtener el menú de opciones personalizado según el partido seleccionado.
+  private getMenuForMatch = (match: any): string => {
+    const fechaFormateada = this.formatFecha(match.fecha);
+    return `Seleccione una opción para el partido del ${fechaFormateada} a las ${match.hora} en ${match.lugar}:\n1. Convocarme.\n2. Desconvocarme.\n3. Ver Listado de Jugadores.\n4. Salir.`;
+  };
+
+  // Método para obtener el menú genérico.
   private getMenu = (): string => {
     return "Seleccione una opción:\n1. Convocarme.\n2. Desconvocarme.\n3. Ver Listado de Jugadores.\n4. Salir.";
-  }
+  };
 
   private obtenerListaPartidos = async (): Promise<string> => {
     try {
@@ -158,7 +169,7 @@ export class WhatsappController {
     } catch (error) {
       return "Error al obtener los partidos disponibles.";
     }
-  }
+  };
 
   private obtenerPartidosVigentes = async (): Promise<any[]> => {
     try {
@@ -174,10 +185,10 @@ export class WhatsappController {
     } catch (error) {
       return [];
     }
-  }
+  };
 
   private obtenerListadoJugadores = async (idUsuario: string): Promise<string> => {
-    const idPartido = selectedMatch.get(idUsuario);
+    const idPartido = selectedMatch.get(idUsuario)?.id || (selectedMatch.get(idUsuario) ? selectedMatch.get(idUsuario).id : null);
     if (!idPartido) {
       return "No se encontró el partido seleccionado. Por favor, intenta de nuevo.";
     }
@@ -197,25 +208,25 @@ export class WhatsappController {
       if (data.jugadores && Array.isArray(data.jugadores)) {
         data.jugadores.forEach((jugador: any, index: number) => {
           const asterisco = jugador.estado_pago ? "* " : "";
-          mensajeListado += `${index + 1}- ${jugador.nombre_corto} ${asterisco} \n`;
+          mensajeListado += `${index + 1}- ${asterisco}${jugador.nombre_corto}\n`;
         });
       }
       mensajeListado += "-------------------";
       return mensajeListado;
     } catch (error) {
-      return "Error al obtener el listado de jugadores.";
+      return "No hay jugadores seleccionados para ese partido.";
     }
-  }
+  };
 
   public mensajeAlUsuario = (res: Response, texto: string): void => {
     const twiml = new twilio.twiml.MessagingResponse();
     twiml.message(texto);
     res.type("text/xml").send(twiml.toString());
-  }
+  };
 
   public existeTelefono = (telefono: string, id_whatsapp: string): boolean => {
     return id_whatsapp.includes(telefono);
-  }
+  };
 
   private formatFecha = (fecha: string): string => {
     const dias = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
@@ -224,7 +235,7 @@ export class WhatsappController {
     const dateObj = new Date(year, month - 1, day);
     const diaSemana = dias[dateObj.getDay()];
     return `${diaSemana} ${day} de ${meses[month - 1]}`;
-  }
+  };
 
   private formatHora = (tipo: string): string => {
     const parts = tipo.split(" ");
@@ -233,9 +244,9 @@ export class WhatsappController {
       return hour + ":00";
     }
     return "";
-  }
+  };
 
   public isAuthenticated = (idUsuario: string): boolean => {
     return authenticatedUsers.has(idUsuario);
-  }
+  };
 }
