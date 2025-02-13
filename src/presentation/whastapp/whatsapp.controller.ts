@@ -15,6 +15,7 @@ export class WhatsappController {
     const idUsuario = body.From;          // Ejemplo: "+573188216823"
     const mensaje = body.Body.trim();       // Puede ser: cédula, selección de partido o una opción del menú
 
+    
     // --- Flujo A: Usuario NO autenticado ---
     if (!this.isAuthenticated(idUsuario)) {
       if (!pendingCedula.has(idUsuario)) {
