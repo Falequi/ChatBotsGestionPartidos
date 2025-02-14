@@ -223,7 +223,17 @@ export class WhatsappController {
           mensajeListado += `${index + 1}- ${jugador.nombre_corto} ${asterisco} \n`;
         });
       }
-      mensajeListado += "-------------------";
+      mensajeListado += `-------------------\n`;
+      mensajeListado += `🔴🔴 🔴🔴🔴🔴 🔴🔴🔴🔴 🔴🔴🔴🔴 \n`
+      mensajeListado += `Se debe cancelar $18.000. Plazo para consignar hasta el Miércoles a las 8 pm \n` 
+      mensajeListado += `🔴🔴 🔴🔴🔴🔴 🔴🔴🔴🔴 🔴🔴🔴🔴 \n`
+      mensajeListado += ` Bancolombia\n`
+      mensajeListado += `Número de Cuenta  75687416244 Ahorros \n`
+      mensajeListado += `Fabio Alejandro Quintero Cédula 4.375.857\n`
+      mensajeListado += `Daviplata: 3188216823\n`
+      mensajeListado += `Nequi : 3188216823\n`
+      mensajeListado += `Dale: 3188216823\n`
+      mensajeListado += `-------------------\n`;
       return mensajeListado;
     } catch (error) {
       return "No hay jugadores seleccionados para ese partido.";
