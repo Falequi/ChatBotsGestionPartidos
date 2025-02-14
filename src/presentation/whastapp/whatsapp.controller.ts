@@ -224,9 +224,9 @@ export class WhatsappController {
         });
       }
       mensajeListado += `-------------------\n`;
-      mensajeListado += `🔴🔴 🔴🔴🔴🔴 🔴🔴🔴🔴 🔴🔴🔴🔴 \n`
+      mensajeListado += `🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴 \n`
       mensajeListado += `Se debe cancelar $18.000. Plazo para consignar hasta el Miércoles a las 8 pm \n` 
-      mensajeListado += `🔴🔴 🔴🔴🔴🔴 🔴🔴🔴🔴 🔴🔴🔴🔴 \n`
+      mensajeListado += `🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴 \n`
       mensajeListado += ` Bancolombia\n`
       mensajeListado += `Número de Cuenta  75687416244 Ahorros \n`
       mensajeListado += `Fabio Alejandro Quintero Cédula 4.375.857\n`
