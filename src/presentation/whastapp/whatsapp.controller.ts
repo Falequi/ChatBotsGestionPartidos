@@ -15,7 +15,7 @@ export class WhatsappController {
     const idUsuario = body.From;          // Ejemplo: "+573188216823"
     const mensaje = body.Body.trim();       // Puede ser: cédula, selección de partido o una opción del menú
 
-    
+
     // --- Flujo A: Usuario NO autenticado ---
     if (!this.isAuthenticated(idUsuario)) {
       if (!pendingCedula.has(idUsuario)) {
@@ -28,21 +28,20 @@ export class WhatsappController {
           const nombre = response.data.nombre_corto;
           const telefonoRegistrado = response.data.telefono;  // Ejemplo: "3188216823"
           const idJugador = response.data.id;
-          
+
           if (!this.existeTelefono(telefonoRegistrado, idUsuario)) {
             pendingCedula.delete(idUsuario);
             this.mensajeAlUsuario(res, "El número de WhatsApp no coincide con el número registrado. Por favor, verifica.");
             return;
           }
-          
+
           await axios.put(`https://gestionpartidos-production.up.railway.app/jugadores/${idJugador}`, { "id_telegram": idUsuario });
           pendingCedula.delete(idUsuario);
           authenticatedUsers.set(idUsuario, response.data);
-          
           const listaPartidos = await this.obtenerListaPartidos();
           const partidosVigentes = await this.obtenerPartidosVigentes();
           pendingMatchSelection.set(idUsuario, partidosVigentes);
-          
+
           // Se envía el mensaje de confirmación SIN el menú.
           this.mensajeAlUsuario(res, `Hola ${nombre}, gracias por autenticarte.\n\n${listaPartidos}`);
           return;
@@ -225,7 +224,7 @@ export class WhatsappController {
       }
       mensajeListado += `-------------------\n`;
       mensajeListado += `🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴 \n`
-      mensajeListado += `Se debe cancelar $18.000. Plazo para consignar hasta el Miércoles a las 8 pm \n` 
+      mensajeListado += `Se debe cancelar $18.000. Plazo para consignar hasta el Miércoles a las 8 pm \n`
       mensajeListado += `🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴 \n`
       mensajeListado += ` Bancolombia\n`
       mensajeListado += `Número de Cuenta  75687416244 Ahorros \n`
