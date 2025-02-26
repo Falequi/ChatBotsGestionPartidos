@@ -165,7 +165,7 @@ export class WhatsappController {
       const hoyMidnight = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
       const partidosVigentes = partidos.filter((p: any) => {
         const fechaPartido = new Date(p.fecha);
-        return fechaPartido >= hoyMidnight;
+        return fechaPartido > hoyMidnight;
       });
       if (partidosVigentes.length === 0) {
         return "No hay partidos vigentes en este momento.";
@@ -190,7 +190,7 @@ export class WhatsappController {
       const hoyMidnight = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
       const partidosVigentes = partidos.filter((p: any) => {
         const fechaPartido = new Date(p.fecha);
-        return fechaPartido >= hoyMidnight;
+        return fechaPartido > hoyMidnight;
       });
       return partidosVigentes;
     } catch (error) {
